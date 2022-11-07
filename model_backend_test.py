@@ -1,4 +1,5 @@
 import os 
+import numpy as np
 import cv2
 import torch 
 from PIL import Image
@@ -46,14 +47,15 @@ class BloodcellModel(LabelStudioMLBase):
         all_scores= []
         print("LABELS IN CONFIG:",self.labels_in_config)
         for task in tasks:
+           
             image_url = self._get_image_url(task)
             image_path = self.get_local_path(image_url, project_dir=self.image_dir)
-            ori_h, ori_w = image.shape[:2]
-            image = cv2.resize(image_path, (self.img_size[0], self.img_size[1]))
-            image = torch.from_numpy(image).permute(2,0,1).to(self.device)
-            image = image.float() / 255.0
-            preds = self.model(image)
+            img = Image.open(image_path)
+            img_width, img_height = get_image_size(image_path)
+            
+            preds = self.model(img, size=img_width)
             preds_df = preds.pandas().xyxy[0]
+            
             for x_min,y_min,x_max,y_max,confidence,class_,name_ in zip(preds_df['xmin'],preds_df['ymin'],
                                                                         preds_df['xmax'],preds_df['ymax'],
                                                                         preds_df['confidence'],preds_df['class'],
@@ -69,15 +71,15 @@ class BloodcellModel(LabelStudioMLBase):
                 results.append({
                     'from_name': self.from_name,
                     'to_name': self.to_name,
-                    "original_width": ori_w,
-                    "original_height": ori_h,
+                    "original_width": img_width,
+                    "original_height": img_height,
                     'type': 'rectanglelabels',
                     'value': {
                         'rectanglelabels': [name_],
-                        'x': x_min / ori_w * 100,
-                        'y': y_min / ori_h * 100,
-                        'width': (x_max - x_min) / ori_w * 100,
-                        'height': (y_max - y_min) / ori_h * 100
+                        'x': x_min / img_width * 100,
+                        'y': y_min / img_height * 100,
+                        'width': (x_max - x_min) / img_width * 100,
+                        'height': (y_max - y_min) / img_height * 100
                     },
                     'score': confidence
                 })
