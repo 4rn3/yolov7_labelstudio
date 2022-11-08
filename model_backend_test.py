@@ -1,16 +1,16 @@
-import os 
+import os
 import numpy as np
-import cv2
 import torch 
 from PIL import Image
+
 from label_studio_ml.model import LabelStudioMLBase
 from label_studio_ml.utils import get_image_size, get_single_tag_keys
+from label_studio.core.utils.io import json_load, get_data_dir
 
-from label_studio.core.utils.io import json_load, get_data_dir 
 
 YOLO_REPO = "WongKinYiu/yolov7"
 WEIGHTS = './fine_tuned_results/tiny-100epoch-bs8/yolov7-tiny-1OOepoch.pt'
-DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
+DEVICE = 'cuda:0' if torch.cuda.is_available() else 'cpu'
 IMAGE_SIZE = (640,480)
 
 class BloodcellModel(LabelStudioMLBase):
@@ -40,6 +40,9 @@ class BloodcellModel(LabelStudioMLBase):
     def _get_image_url(self,task):
         image_url = task['data'][self.value] 
         return image_url
+
+    def fit(self, completions, workdir=None, **kwargs):
+        return {'model_path': './', 'values':{0:0}}
     
     def predict(self, tasks, **kwargs):
 
