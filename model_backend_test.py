@@ -3,10 +3,12 @@ import numpy as np
 import torch 
 from PIL import Image
 
+from label_studio_ml import model
 from label_studio_ml.model import LabelStudioMLBase
 from label_studio_ml.utils import get_image_size, get_single_tag_keys
 from label_studio.core.utils.io import json_load, get_data_dir
 
+model.LABEL_STUDIO_ML_BACKEND_V2_DEFAULT = True
 
 YOLO_REPO = "WongKinYiu/yolov7"
 WEIGHTS = './fine_tuned_results/tiny-100epoch-bs8/yolov7-tiny-1OOepoch.pt'
@@ -42,7 +44,7 @@ class BloodcellModel(LabelStudioMLBase):
         return image_url
 
     def fit(self, completions, workdir=None, **kwargs):
-        return {'model_path': './', 'values':{0:0}}
+        return {'model_path': './', 'value':{0:0}}
     
     def predict(self, tasks, **kwargs):
 
