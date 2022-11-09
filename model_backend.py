@@ -5,7 +5,7 @@ from PIL import Image
 
 from label_studio_ml import model
 from label_studio_ml.model import LabelStudioMLBase
-from label_studio_ml.utils import get_image_size, get_single_tag_keys
+from label_studio_ml.utils import get_image_size, get_single_tag_keys, is_skipped, get_choice
 from label_studio.core.utils.io import json_load, get_data_dir
 
 model.LABEL_STUDIO_ML_BACKEND_V2_DEFAULT = True
@@ -40,15 +40,28 @@ class BloodcellModel(LabelStudioMLBase):
                     self.label_map[predicted_value] = label_name
     
     def _get_image_url(self,task):
-        image_url = task['data'][self.value] 
+        image_url = task['data'][self.value]
         return image_url
 
     def fit(self, tasks, workdir=None, **kwargs):
-    # Retrieve the annotation ID from the payload of the webhook event
-    # Use the ID to retrieve annotation data using the SDK or the API
-    # Do some computations and get your model
-        return {'checkpoints': './'}
-    ## JSON dictionary with trained model artifacts that you can use later in code with self.train_output
+        image_urls, image_classes  = [], []
+
+        for task in tasks:
+            if is_skipped(task):
+                continue
+
+            image_urls.append(task['data'][self.value])
+            image_classes.append(get_choice(task))
+            #print zetten in model.py op lijn 110 van typeof om type te controleren
+            #proberen dir van cfg en data.yaml in self te initieren
+            #need to make Dataset & DataLoader
+            #train model but need to find a a way to use opt and hyp files
+
+            #self.model.train()#need to figure out what params to give
+            model_path = os.path.join(workdir, 'model.pt')
+            self.model.save(model_path)
+
+        return {'model_path': model_path}
     
     def predict(self, tasks, **kwargs):
 
