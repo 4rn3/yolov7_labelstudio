@@ -1,4 +1,4 @@
-import os, sys
+import os, sys, random, shutil
 import numpy as np
 import torch 
 from PIL import Image
@@ -13,20 +13,20 @@ from models.experimental import attempt_load
 
 model.LABEL_STUDIO_ML_BACKEND_V2_DEFAULT = True
 
-YOLO_REPO = '../yolov7'
+IMG_DATA = './data/images/'
+LABEL_DATA = "./data/labels/"
 WEIGHTS = './fine_tuned_results/tiny-100epoch-bs8/yolov7-tiny-1OOepoch.pt'
 DEVICE = 'cuda:0' if torch.cuda.is_available() else 'cpu'
 IMAGE_SIZE = (640,480)
 
 class BloodcellModel(LabelStudioMLBase):
-    def __init__(self, weights=WEIGHTS,  device=DEVICE, img_size=IMAGE_SIZE, yolo_repo=YOLO_REPO, train_output=None, **kwargs):
+    def __init__(self, weights=WEIGHTS,  device=DEVICE, img_size=IMAGE_SIZE, train_output=None, **kwargs):
         super(BloodcellModel, self).__init__(**kwargs)
         self.device = device
         upload_dir = os.path.join(get_data_dir(), 'media', 'upload')
         self.image_dir = upload_dir
         self.img_size = img_size
         self.label_map = {}
-        self.yolo_repo = yolo_repo
         self.model = attempt_load(weights, map_location=device)
         
         self.from_name, self.to_name, self.value, self.labels_in_config = get_single_tag_keys(
@@ -46,6 +46,13 @@ class BloodcellModel(LabelStudioMLBase):
         image_url = task['data'][self.value]
         return image_url
 
+    def label2idx(self, label):
+        if label == 'Platelets':
+            return 0
+        if label == "RBC":
+            return 1
+        return 2
+
     def fit(self, tasks, workdir=None, batch_size=16, num_epochs=10, **kwargs):
         image_urls, image_labels = [], []
         for task in tasks:
@@ -53,22 +60,36 @@ class BloodcellModel(LabelStudioMLBase):
             if is_skipped(task):
                 continue
             
-            image_path = self.get_local_path(task['data'][self.value])
+            image_url = self._get_image_url(task)
+            image_path = self.get_local_path(image_url)
+            image_name = image_path.split("\\")[-1]
+            Image.open(image_path).save(IMG_DATA+image_name)
 
             for annotation in task['annotations']:
                 for bbox in annotation['result']:
-                    x = bbox['value']['x']
-                    y = bbox['value']['y']
-                    width = bbox['value']['width']
-                    height = bbox['value']['height']
+                    x = bbox['value']['x'] / self.img_size[0]
+                    y = bbox['value']['y'] / self.img_size[1]
+                    width = bbox['value']['width'] / self.img_size[0]
+                    height = bbox['value']['height'] / self.img_size[1]
                     label = bbox['value']['rectanglelabels']
+                    label_idx = self.label2idx(label[0])
+
+                    with open(LABEL_DATA+image_name[:-5]+'.txt', 'a') as f:
+                        f.write(f"{label_idx} {x} {y} {width} {height}\n")
+
+        files = os.listdir(IMG_DATA)
+        no_of_files = int(len(files)*0.3)
+
+        for file_name in random.sample(files, no_of_files):
+            shutil.move(os.path.join(IMG_DATA, file_name[:-5]+'.jpeg'), IMG_DATA+"val/")
+            shutil.move(os.path.join(LABEL_DATA, file_name[:-5]+'.txt'), IMG_DATA+"val/")
+
+        for file in os.listdir(IMG_DATA):
+            shutil.move(os.path.join(IMG_DATA, file[:-5]+'.jpeg'), IMG_DATA+"train/")
+            shutil.move(os.path.join(IMG_DATA, file[:-5]+'.txt'), IMG_DATA+"train/")
+
 
             #TODO:
-            #pixel norm: x/self.img[x] , width/self.img[x] <- same for y,height
-            #map class to 0 -> 2
-            #save imgs in data/img/train
-            #save labels as class x_center y_center width height in data/label/train with same name as corresponding img
-            #test the other way of loading/ training model
             #change weight loading path to runs/name/weights/fine_tuned.pt
 
         return {'model_path': "./", 'labels': ""}
