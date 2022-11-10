@@ -1,4 +1,4 @@
-import os
+import os, sys
 import numpy as np
 import torch 
 from PIL import Image
@@ -8,9 +8,12 @@ from label_studio_ml.model import LabelStudioMLBase
 from label_studio_ml.utils import get_image_size, get_single_tag_keys, is_skipped, get_choice
 from label_studio.core.utils.io import json_load, get_data_dir
 
+sys.path.insert(1, './yolov7/')
+from models.experimental import attempt_load
+
 model.LABEL_STUDIO_ML_BACKEND_V2_DEFAULT = True
 
-YOLO_REPO = "WongKinYiu/yolov7"
+YOLO_REPO = '../yolov7'
 WEIGHTS = './fine_tuned_results/tiny-100epoch-bs8/yolov7-tiny-1OOepoch.pt'
 DEVICE = 'cuda:0' if torch.cuda.is_available() else 'cpu'
 IMAGE_SIZE = (640,480)
@@ -24,7 +27,7 @@ class BloodcellModel(LabelStudioMLBase):
         self.img_size = img_size
         self.label_map = {}
         self.yolo_repo = yolo_repo
-        self.model = torch.hub.load(yolo_repo, 'custom', weights, trust_repo=True)
+        self.model = attempt_load(weights, map_location=device)
         
         self.from_name, self.to_name, self.value, self.labels_in_config = get_single_tag_keys(
             self.parsed_label_config, 'RectangleLabels', 'Image'
@@ -43,25 +46,32 @@ class BloodcellModel(LabelStudioMLBase):
         image_url = task['data'][self.value]
         return image_url
 
-    def fit(self, tasks, workdir=None, **kwargs):
-        image_urls, image_classes  = [], []
-
+    def fit(self, tasks, workdir=None, batch_size=16, num_epochs=10, **kwargs):
+        image_urls, image_labels = [], []
         for task in tasks:
+            
             if is_skipped(task):
                 continue
+            
+            image_path = self.get_local_path(task['data'][self.value])
 
-            image_urls.append(task['data'][self.value])
-            image_classes.append(get_choice(task))
-            #print zetten in model.py op lijn 110 van typeof om type te controleren
-            #proberen dir van cfg en data.yaml in self te initieren
-            #need to make Dataset & DataLoader
-            #train model but need to find a a way to use opt and hyp files
+            for annotation in task['annotations']:
+                for bbox in annotation['result']:
+                    x = bbox['value']['x']
+                    y = bbox['value']['y']
+                    width = bbox['value']['width']
+                    height = bbox['value']['height']
+                    label = bbox['value']['rectanglelabels']
 
-            #self.model.train()#need to figure out what params to give
-            model_path = os.path.join(workdir, 'model.pt')
-            self.model.save(model_path)
+            #TODO:
+            #pixel norm: x/self.img[x] , width/self.img[x] <- same for y,height
+            #map class to 0 -> 2
+            #save imgs in data/img/train
+            #save labels as class x_center y_center width height in data/label/train with same name as corresponding img
+            #test the other way of loading/ training model
+            #change weight loading path to runs/name/weights/fine_tuned.pt
 
-        return {'model_path': model_path}
+        return {'model_path': "./", 'labels': ""}
     
     def predict(self, tasks, **kwargs):
 
