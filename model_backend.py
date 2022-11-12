@@ -108,7 +108,7 @@ class BloodcellModel(LabelStudioMLBase):
                     height = bbox['value']['height'] / 100
                     label = bbox['value']['rectanglelabels']
                     label_idx = self.label2idx(label[0])
-
+                    #TODO check if coords are correct now
                     with open(LABEL_DATA+image_name[:-5]+'.txt', 'a') as f:
                         f.write(f"{label_idx} {x_center} {y_center} {width} {height}\n")
         
