@@ -99,7 +99,7 @@ class BloodcellModel(LabelStudioMLBase):
             image_name = image_path.split("\\")[-1]
 
             Image.open(image_path).save(IMG_DATA+image_name)
-
+            #TODO check why img size changed to 320 240
             for annotation in task['annotations']:
                 for bbox in annotation['result']:
                     x_center = bbox['value']['x'] / 100
@@ -125,9 +125,9 @@ class BloodcellModel(LabelStudioMLBase):
         os.system(f"python ./yolov7/train.py --workers 8 --device {self.device} --batch-size {batch_size} --data config/data.yaml --img 320 240 --cfg config/model_config.yaml \
             --weights {self.weights} --name bloodcell_trained --hyp confid/hyp.scratch.p5.yaml --exist-ok")
 
-        #shutil.move(f"./runs/train/bloodcell_trained/best.pt", MODEL_PATH)#move trained weights to checkpoint folder
+        shutil.move(f"./runs/train/bloodcell_trained/best.pt", MODEL_PATH)#move trained weights to checkpoint folder
 
-        return {'model_path': "./"}
+        return {'model_path': MODEL_PATH}
     
     def predict(self, tasks, **kwargs):
         print("start predictions")
