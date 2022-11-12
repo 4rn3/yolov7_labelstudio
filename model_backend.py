@@ -122,10 +122,10 @@ class BloodcellModel(LabelStudioMLBase):
         self.move_files(label_files,val_percent,img_label=LABEL_DATA)
         self.move_files(label_files,val_percent,train_val="val/",img_label=LABEL_DATA)
 
-        os.system(f"python ./yolov7/train.py --workers 8 --device {self.device} --batch-size {batch_size} --data config/data.yaml --img 320 240 --cfg config/model_config.yaml \
-            --weights {self.weights} --name bloodcell_trained --hyp confid/hyp.scratch.p5.yaml --exist-ok")
+        os.system(f"python ./yolov7/train.py --workers 8 --device {self.device} --batch-size {batch_size} --data ./config/data.yaml --img 320 240 --cfg ./config/model_config.yaml \
+            --weights {self.weights} --name bloodcell_trained --hyp ./config/hyp.scratch.p5.yaml --exist-ok")
 
-        shutil.move(f"./runs/train/bloodcell_trained/best.pt", MODEL_PATH)#move trained weights to checkpoint folder
+        #shutil.move(f"./runs/train/bloodcell_trained/best.pt", MODEL_PATH)#move trained weights to checkpoint folder
 
         return {'model_path': MODEL_PATH}
     
@@ -172,6 +172,8 @@ class BloodcellModel(LabelStudioMLBase):
                     'score': confidence
                 })
                 all_scores.append(confidence)
+                print(f'height:{(y_max - y_min) / img_height * 100}')
+                print(f'width:{(x_max - x_min) / img_width * 100}')
                 print(results)
 
         avg_score = sum(all_scores) / max(len(all_scores), 1)
