@@ -86,7 +86,7 @@ class BloodcellModel(LabelStudioMLBase):
             os.makedirs(LABEL_DATA+"/train/")
             os.makedirs(LABEL_DATA+"/val/")
 
-    def fit(self, tasks, workdir=None, batch_size=16, num_epochs=10, **kwargs):
+    def fit(self, tasks, workdir=None, batch_size=2, num_epochs=10, **kwargs):
         print("start training")
         self.init_train_val()
         for task in tasks:
@@ -99,16 +99,15 @@ class BloodcellModel(LabelStudioMLBase):
             image_name = image_path.split("\\")[-1]
 
             Image.open(image_path).save(IMG_DATA+image_name)
-            #TODO check why img size changed to 320 240
             for annotation in task['annotations']:
                 for bbox in annotation['result']:
                     x_center = bbox['value']['x'] / 100
                     y_center = bbox['value']['y'] / 100
-                    width = bbox['value']['width'] / 100
-                    height = bbox['value']['height'] / 100
+                    width = (bbox['value']['width']*2) / 100 #TODO check if coords are correct now
+                    height = (bbox['value']['height']*2) / 100
                     label = bbox['value']['rectanglelabels']
                     label_idx = self.label2idx(label[0])
-                    #TODO check if coords are correct now
+                    
                     with open(LABEL_DATA+image_name[:-5]+'.txt', 'a') as f:
                         f.write(f"{label_idx} {x_center} {y_center} {width} {height}\n")
         
@@ -122,8 +121,8 @@ class BloodcellModel(LabelStudioMLBase):
         self.move_files(label_files,val_percent,img_label=LABEL_DATA)
         self.move_files(label_files,val_percent,train_val="val/",img_label=LABEL_DATA)
 
-        os.system(f"python ./yolov7/train.py --workers 8 --device {self.device} --batch-size {batch_size} --data ./config/data.yaml --img 320 240 --cfg ./config/model_config.yaml \
-            --weights {self.weights} --name bloodcell_trained --hyp ./config/hyp.scratch.p5.yaml --exist-ok")
+        os.system(f"python ./yolov7/train.py --workers 0 --device {self.device} --batch-size {batch_size} --data ./config/data.yaml --img {self.img_size[0]} {self.img_size[1]} --cfg ./config/model_config.yaml \
+            --weights {self.weights} --name bloodcell_trained --hyp ./config/hyp.scratch.p5.yaml --epochs {num_epochs} --exist-ok")
 
         #shutil.move(f"./runs/train/bloodcell_trained/best.pt", MODEL_PATH)#move trained weights to checkpoint folder
 
