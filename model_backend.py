@@ -1,4 +1,5 @@
 import os, sys, random, shutil
+import glob
 import numpy as np
 import torch 
 from PIL import Image
@@ -25,7 +26,7 @@ class BloodcellModel(LabelStudioMLBase):
         super(BloodcellModel, self).__init__(**kwargs)
         upload_dir = os.path.join(get_data_dir(), 'media', 'upload')
         
-        if os.path.isfile(MODEL_PATH):
+        if os.path.isfile(MODEL_PATH):#TODO extract to load and load in train and test
             self.weights = MODEL_PATH
         else:
             self.weights = weights
@@ -61,19 +62,20 @@ class BloodcellModel(LabelStudioMLBase):
             return 1
         return 2
 
-    def move_files(self,files, percent, train_val="train/", img_label=IMG_DATA):
-        #move new img, label to train/val dir
-        if train_val=="train/":
-            start = 0
-            end = len(files)-percent 
-        else: 
-            start= len(files)-percent
-            end = len(files)
+    def move_files(self, files, label_img_data, val_percent=0.3):
+        print("moving files")
+        val_percent = int(len(files)*val_percent)
 
-        for file in files[start:end]:
-            shutil.move(os.path.join(img_label,file), os.path.join(img_label+train_val,file) )
+        for ix, file in enumerate(files):
+            train_val = "val/"
+            if len(files) - ix > val_percent:
+                train_val = "train/"
 
-    def init_train_val(self):
+            base_path = os.path.basename(file)
+            dest = os.path.join(label_img_data,train_val,base_path)
+            shutil.move(file, dest)
+
+    def init_train_val(self):#TODO refactor
         #clean up left over training files
         if len(os.listdir(IMG_DATA +"/train/")) >0:
             shutil.rmtree(IMG_DATA+"/train/")
@@ -86,9 +88,8 @@ class BloodcellModel(LabelStudioMLBase):
             os.makedirs(LABEL_DATA+"/train/")
             os.makedirs(LABEL_DATA+"/val/")
 
-    def fit(self, tasks, workdir=None, batch_size=2, num_epochs=10, **kwargs):
+    def fit(self, tasks, workdir=None, batch_size=8, num_epochs=10, **kwargs):
         print("start training")
-        self.init_train_val()
         for task in tasks:
             
             if is_skipped(task):
@@ -97,34 +98,31 @@ class BloodcellModel(LabelStudioMLBase):
             image_url = self._get_image_url(task)
             image_path = self.get_local_path(image_url)
             image_name = image_path.split("\\")[-1]
+            Image.open(image_path).resize(IMAGE_SIZE).save(IMG_DATA+image_name)
 
-            Image.open(image_path).save(IMG_DATA+image_name)
             for annotation in task['annotations']:
-                for bbox in annotation['result']:
-                    x_center = bbox['value']['x'] / 100
-                    y_center = bbox['value']['y'] / 100
-                    width = (bbox['value']['width']*2) / 100 #TODO check if coords are correct now
-                    height = (bbox['value']['height']*2) / 100
+                for bbox in annotation['result']:#bbox coords don't fit yet
+                    x_center = (bbox['value']['x']) / 100
+                    y_center = (bbox['value']['y']) / 100
+                    bb_width = (bbox['value']['width']) / 100
+                    bb_height = (bbox['value']['height']) / 100
                     label = bbox['value']['rectanglelabels']
                     label_idx = self.label2idx(label[0])
                     
                     with open(LABEL_DATA+image_name[:-5]+'.txt', 'a') as f:
-                        f.write(f"{label_idx} {x_center} {y_center} {width} {height}\n")
+                        f.write(f"{label_idx} {x_center} {y_center} {bb_width} {bb_height}\n")
         
-        img_files = os.listdir(IMG_DATA)[:-2]
-        val_percent = int(len(img_files)*0.3)
-        
-        self.move_files(img_files,val_percent)
-        self.move_files(img_files,val_percent,train_val="val/")
+        img_files = glob.glob(os.path.join(IMG_DATA, "*.jpeg"))
+        label_files = glob.glob(os.path.join(LABEL_DATA, "*.txt"))
 
-        label_files = os.listdir(LABEL_DATA)[:-2]
-        self.move_files(label_files,val_percent,img_label=LABEL_DATA)
-        self.move_files(label_files,val_percent,train_val="val/",img_label=LABEL_DATA)
+        self.move_files(img_files, IMG_DATA)
+        self.move_files(label_files, LABEL_DATA)
 
-        os.system(f"python ./yolov7/train.py --workers 0 --device {self.device} --batch-size {batch_size} --data ./config/data.yaml --img {self.img_size[0]} {self.img_size[1]} --cfg ./config/model_config.yaml \
+
+        os.system(f"python ./yolov7/train.py --workers 8 --device {self.device} --batch-size {batch_size} --data ./config/data.yaml --img {self.img_size[0]} {self.img_size[1]} --cfg ./config/model_config.yaml \
             --weights {self.weights} --name bloodcell_trained --hyp ./config/hyp.scratch.p5.yaml --epochs {num_epochs} --exist-ok")
 
-        #shutil.move(f"./runs/train/bloodcell_trained/best.pt", MODEL_PATH)#move trained weights to checkpoint folder
+        shutil.move(f"./runs/train/bloodcell_trained/best.pt", MODEL_PATH)#move trained weights to checkpoint folder
 
         return {'model_path': MODEL_PATH}
     
@@ -171,8 +169,6 @@ class BloodcellModel(LabelStudioMLBase):
                     'score': confidence
                 })
                 all_scores.append(confidence)
-                print(f'height:{(y_max - y_min) / img_height * 100}')
-                print(f'width:{(x_max - x_min) / img_width * 100}')
                 print(results)
 
         avg_score = sum(all_scores) / max(len(all_scores), 1)
