@@ -98,31 +98,33 @@ class BloodcellModel(LabelStudioMLBase):
             image_url = self._get_image_url(task)
             image_path = self.get_local_path(image_url)
             image_name = image_path.split("\\")[-1]
-            Image.open(image_path).resize(IMAGE_SIZE).save(IMG_DATA+image_name)
+            Image.open(image_path).save(IMG_DATA+image_name)
 
             for annotation in task['annotations']:
                 for bbox in annotation['result']:#bbox coords don't fit yet
-                    x_center = (bbox['value']['x']) / 100
-                    y_center = (bbox['value']['y']) / 100
                     bb_width = (bbox['value']['width']) / 100
                     bb_height = (bbox['value']['height']) / 100
+                    x = (bbox['value']['x'] + (bb_width/2)) / 100
+                    y = (bbox['value']['y']) / 100
+                    if y < 0:
+                        y = 0
                     label = bbox['value']['rectanglelabels']
                     label_idx = self.label2idx(label[0])
                     
-                    with open(LABEL_DATA+image_name[:-5]+'.txt', 'a') as f:
-                        f.write(f"{label_idx} {x_center} {y_center} {bb_width} {bb_height}\n")
+                    with open(LABEL_DATA+image_name[:-4]+'.txt', 'a') as f:
+                        f.write(f"{label_idx} {x} {y} {bb_width} {bb_height}\n")
         
-        img_files = glob.glob(os.path.join(IMG_DATA, "*.jpeg"))
+        img_files = glob.glob(os.path.join(IMG_DATA, "*.jpg"))
         label_files = glob.glob(os.path.join(LABEL_DATA, "*.txt"))
 
         self.move_files(img_files, IMG_DATA)
         self.move_files(label_files, LABEL_DATA)
 
 
-        os.system(f"python ./yolov7/train.py --workers 8 --device {self.device} --batch-size {batch_size} --data ./config/data.yaml --img {self.img_size[0]} {self.img_size[1]} --cfg ./config/model_config.yaml \
-            --weights {self.weights} --name bloodcell_trained --hyp ./config/hyp.scratch.p5.yaml --epochs {num_epochs} --exist-ok")
+        #os.system(f"python ./yolov7/train.py --workers 8 --device {self.device} --batch-size {batch_size} --data ./config/data.yaml --img {self.img_size[0]} {self.img_size[1]} --cfg ./config/model_config.yaml \
+            #--weights {self.weights} --name bloodcell_trained --hyp ./config/hyp.scratch.p5.yaml --epochs {num_epochs} --exist-ok")
 
-        shutil.move(f"./runs/train/bloodcell_trained/best.pt", MODEL_PATH)#move trained weights to checkpoint folder
+        #shutil.move(f"./runs/train/bloodcell_trained/best.pt", MODEL_PATH)#move trained weights to checkpoint folder
 
         return {'model_path': MODEL_PATH}
     
