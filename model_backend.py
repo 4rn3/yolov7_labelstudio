@@ -14,7 +14,7 @@ model.LABEL_STUDIO_ML_BACKEND_V2_DEFAULT = True
 IMG_DATA = './data/images/'
 LABEL_DATA = './data/labels/'
 WEIGHTS = './config/checkpoints/starting_weights.pt'#save location for finetuned weights
-MODEL_PATH = './config/checkpoints/trained_weights.pt'#save location for weights after training
+WEIGHTS_PATH = './config/checkpoints/trained_weights.pt'#save location for weights after training
 DEVICE = 'cuda:0' if torch.cuda.is_available() else 'cpu'
 REPO = "./yolov7"
 IMAGE_SIZE = (640,480)
@@ -24,8 +24,8 @@ class BloodcellModel(LabelStudioMLBase):
         super(BloodcellModel, self).__init__(**kwargs)
         upload_dir = os.path.join(get_data_dir(), 'media', 'upload')
         
-        if os.path.isfile(MODEL_PATH):#TODO extract to load and load in train and test
-            self.weights = MODEL_PATH
+        if os.path.isfile(WEIGHTS_PATH):#TODO extract to load and load in train and test
+            self.weights = WEIGHTS_PATH
         else:
             self.weights = weights
 
@@ -124,9 +124,11 @@ class BloodcellModel(LabelStudioMLBase):
         os.system(f"python ./yolov7/train.py --workers 8 --device cpu --batch-size {batch_size} --data ./config/data.yaml --img {self.img_size[0]} {self.img_size[1]} --cfg ./config/model_config.yaml \
             --weights {self.weights} --name bloodcell_trained --hyp ./config/hyp.scratch.custom.yaml --epochs {num_epochs} --exist-ok")
 
-        #shutil.move(f"./runs/train/bloodcell_trained/best.pt", MODEL_PATH)#move trained weights to checkpoint folder
+        shutil.move(f"./runs/train/bloodcell_trained/weights/best.pt", WEIGHTS_PATH)#move trained weights to checkpoint folder
         print("done training")
-        return {'model_path': MODEL_PATH}
+
+        #TODO update model weights 
+        return {'model_path': WEIGHTS_PATH}
     
     def predict(self, tasks, **kwargs):
         print("start predictions")
