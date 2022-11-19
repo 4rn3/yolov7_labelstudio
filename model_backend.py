@@ -101,7 +101,7 @@ class BloodcellModel(LabelStudioMLBase):
             Image.open(image_path).save(IMG_DATA+image_name)
 
             for annotation in task['annotations']:
-                for bbox in annotation['result']:#bbox coords don't fit yet
+                for bbox in annotation['result']:
                     bb_width = (bbox['value']['width']) / 100
                     bb_height = (bbox['value']['height']) / 100
                     x = (bbox['value']['x'] / 100 ) + (bb_width/2)
@@ -119,10 +119,10 @@ class BloodcellModel(LabelStudioMLBase):
         self.move_files(label_files, LABEL_DATA)
 
 
-        #os.system(f"python ./yolov7/train.py --workers 8 --device {self.device} --batch-size {batch_size} --data ./config/data.yaml --img {self.img_size[0]} {self.img_size[1]} --cfg ./config/model_config.yaml \
-            #--weights {self.weights} --name bloodcell_trained --hyp ./config/hyp.scratch.p5.yaml --epochs {num_epochs} --exist-ok")
+        os.system(f"python ./yolov7/train.py --workers 8 --device {self.device} --batch-size {batch_size} --data ./config/data.yaml --img {self.img_size[0]} {self.img_size[1]} --cfg ./config/model_config.yaml \
+            --weights {self.weights} --name bloodcell_trained --hyp ./config/hyp.scratch.p5.yaml --epochs {num_epochs} --exist-ok")
 
-        #shutil.move(f"./runs/train/bloodcell_trained/best.pt", MODEL_PATH)#move trained weights to checkpoint folder
+        shutil.move(f"./runs/train/bloodcell_trained/best.pt", MODEL_PATH)#move trained weights to checkpoint folder
 
         return {'model_path': MODEL_PATH}
     
