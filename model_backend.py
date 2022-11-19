@@ -9,9 +9,6 @@ from label_studio_ml.model import LabelStudioMLBase
 from label_studio_ml.utils import get_image_size, get_single_tag_keys, is_skipped, get_choice
 from label_studio.core.utils.io import json_load, get_data_dir
 
-sys.path.insert(1, './yolov7/')
-from models.experimental import attempt_load
-
 model.LABEL_STUDIO_ML_BACKEND_V2_DEFAULT = True
 
 IMG_DATA = './data/images/'
@@ -19,10 +16,11 @@ LABEL_DATA = './data/labels/'
 WEIGHTS = './config/checkpoints/starting_weights.pt'#save location for finetuned weights
 MODEL_PATH = './config/checkpoints/trained_weights.pt'#save location for weights after training
 DEVICE = 'cuda:0' if torch.cuda.is_available() else 'cpu'
+REPO = "./yolov7"
 IMAGE_SIZE = (640,480)
 
 class BloodcellModel(LabelStudioMLBase):
-    def __init__(self, weights=WEIGHTS,  device=DEVICE, img_size=IMAGE_SIZE, train_output=None, **kwargs):
+    def __init__(self, weights=WEIGHTS,  device=DEVICE, img_size=IMAGE_SIZE, repo=REPO, train_output=None, **kwargs):
         super(BloodcellModel, self).__init__(**kwargs)
         upload_dir = os.path.join(get_data_dir(), 'media', 'upload')
         
@@ -30,13 +28,15 @@ class BloodcellModel(LabelStudioMLBase):
             self.weights = MODEL_PATH
         else:
             self.weights = weights
-        
+
+        self.repo = repo
         self.device = device
         self.image_dir = upload_dir
         self.img_size = img_size
         self.label_map = {}
-        self.model = attempt_load(self.weights, map_location=self.device)
-        
+
+        self.model = torch.hub.load(repo, 'custom', weights, source='local', trust_repo=True)
+
         self.from_name, self.to_name, self.value, self.labels_in_config = get_single_tag_keys(
             self.parsed_label_config, 'RectangleLabels', 'Image'
         )
@@ -104,10 +104,8 @@ class BloodcellModel(LabelStudioMLBase):
                 for bbox in annotation['result']:#bbox coords don't fit yet
                     bb_width = (bbox['value']['width']) / 100
                     bb_height = (bbox['value']['height']) / 100
-                    x = (bbox['value']['x'] + (bb_width/2)) / 100
-                    y = (bbox['value']['y']) / 100
-                    if y < 0:
-                        y = 0
+                    x = (bbox['value']['x'] / 100 ) + (bb_width/2)
+                    y = (bbox['value']['y'] / 100 ) + (bb_height/2)
                     label = bbox['value']['rectanglelabels']
                     label_idx = self.label2idx(label[0])
                     
