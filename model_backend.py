@@ -63,6 +63,7 @@ class BloodcellModel(LabelStudioMLBase):
         return 2
 
     def move_files(self, files, label_img_data, val_percent=0.3):
+        #move files to train or val directories
         print("moving files")
         val_percent = int(len(files)*val_percent)
 
@@ -75,21 +76,20 @@ class BloodcellModel(LabelStudioMLBase):
             dest = os.path.join(label_img_data,train_val,base_path)
             shutil.move(file, dest)
 
-    def init_train_val(self):#TODO refactor
-        #clean up left over training files
-        if len(os.listdir(IMG_DATA +"/train/")) >0:
-            shutil.rmtree(IMG_DATA+"/train/")
-            shutil.rmtree(IMG_DATA+"/val/")
-            shutil.rmtree(LABEL_DATA+"/train/")
-            shutil.rmtree(LABEL_DATA+"/val/")
+    def reset_train_dir(self, dir_path):#TODO refactor
+        #remove cache file and reset train/val dir
+        if os.path.isfile(os.path.join(dir_path,"train.cache")):
+            os.remove(os.path.join(LABEL_DATA, "train.cache"))
+            os.remove(os.path.join(LABEL_DATA, "val.cache"))
 
-            os.makedirs(IMG_DATA+"/train/")
-            os.makedirs(IMG_DATA+"/val/")
-            os.makedirs(LABEL_DATA+"/train/")
-            os.makedirs(LABEL_DATA+"/val/")
+        for dir in os.listdir(dir_path):
+            shutil.rmtree(os.path.join(dir_path, dir))
+            os.makedirs(os.path.join(dir_path, dir))
 
     def fit(self, tasks, workdir=None, batch_size=8, num_epochs=10, **kwargs):
-        print("start training")
+        for dir_path in [IMG_DATA, LABEL_DATA]:
+            self.reset_train_dir(dir_path)
+        
         for task in tasks:
             
             if is_skipped(task):
@@ -118,12 +118,14 @@ class BloodcellModel(LabelStudioMLBase):
         self.move_files(img_files, IMG_DATA)
         self.move_files(label_files, LABEL_DATA)
 
+        print("start training")
+        #TODO try to clean this (import train with argparse somehow)
+        #TODO check why CUDA doesn't work
+        os.system(f"python ./yolov7/train.py --workers 8 --device cpu --batch-size {batch_size} --data ./config/data.yaml --img {self.img_size[0]} {self.img_size[1]} --cfg ./config/model_config.yaml \
+            --weights {self.weights} --name bloodcell_trained --hyp ./config/hyp.scratch.custom.yaml --epochs {num_epochs} --exist-ok")
 
-        os.system(f"python ./yolov7/train.py --workers 8 --device {self.device} --batch-size {batch_size} --data ./config/data.yaml --img {self.img_size[0]} {self.img_size[1]} --cfg ./config/model_config.yaml \
-            --weights {self.weights} --name bloodcell_trained --hyp ./config/hyp.scratch.p5.yaml --epochs {num_epochs} --exist-ok")
-
-        shutil.move(f"./runs/train/bloodcell_trained/best.pt", MODEL_PATH)#move trained weights to checkpoint folder
-
+        #shutil.move(f"./runs/train/bloodcell_trained/best.pt", MODEL_PATH)#move trained weights to checkpoint folder
+        print("done training")
         return {'model_path': MODEL_PATH}
     
     def predict(self, tasks, **kwargs):
