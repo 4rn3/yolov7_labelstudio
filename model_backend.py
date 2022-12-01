@@ -13,21 +13,16 @@ model.LABEL_STUDIO_ML_BACKEND_V2_DEFAULT = True
 
 IMG_DATA = './data/images/'
 LABEL_DATA = './data/labels/'
-WEIGHTS = './config/checkpoints/starting_weights.pt'#save location for finetuned weights
-WEIGHTS_PATH = './config/checkpoints/trained_weights.pt'#save location for weights after training
-DEVICE = 'cuda:0' if torch.cuda.is_available() else 'cpu'
+INIT_WEIGHTS = './config/checkpoints/starting_weights.pt'#save location for finetuned weights
+TRAINED_WEIGHTS = './config/checkpoints/trained_weights.pt'#save location for weights after training
+DEVICE = '0' if torch.cuda.is_available() else 'cpu'
 REPO = "./yolov7"
 IMAGE_SIZE = (640,480)
 
 class BloodcellModel(LabelStudioMLBase):
-    def __init__(self, weights=WEIGHTS,  device=DEVICE, img_size=IMAGE_SIZE, repo=REPO, train_output=None, **kwargs):
+    def __init__(self,  device=DEVICE, img_size=IMAGE_SIZE, repo=REPO, train_output=None, **kwargs):
         super(BloodcellModel, self).__init__(**kwargs)
         upload_dir = os.path.join(get_data_dir(), 'media', 'upload')
-        
-        if os.path.isfile(WEIGHTS_PATH):#TODO extract to load and load in train and test
-            self.weights = WEIGHTS_PATH
-        else:
-            self.weights = weights
 
         self.repo = repo
         self.device = device
@@ -35,7 +30,16 @@ class BloodcellModel(LabelStudioMLBase):
         self.img_size = img_size
         self.label_map = {}
 
-        self.model = torch.hub.load(repo, 'custom', weights, source='local', trust_repo=True)
+        if os.path.isfile(TRAINED_WEIGHTS):
+            self.weights = TRAINED_WEIGHTS
+        else:
+            self.weights = INIT_WEIGHTS
+        
+        print(f"The model initialised with weights: {self.weights}")
+
+
+        self.model = torch.hub.load(self.repo, 'custom', self.weights, source='local', trust_repo=True)
+        self.model.eval()
 
         self.from_name, self.to_name, self.value, self.labels_in_config = get_single_tag_keys(
             self.parsed_label_config, 'RectangleLabels', 'Image'
@@ -49,7 +53,7 @@ class BloodcellModel(LabelStudioMLBase):
             for label_name, label_attrs in self.label_attrs.items():
                 for predicted_value in label_attrs.get('predicted_values', '').split(','):
                     self.label_map[predicted_value] = label_name
-    
+
     def _get_image_url(self,task):
         image_url = task['data'][self.value]
         return image_url
@@ -64,8 +68,16 @@ class BloodcellModel(LabelStudioMLBase):
 
     def move_files(self, files, label_img_data, val_percent=0.3):
         #move files to train or val directories
+        print(files) #empty probably also reason for assertion error
         print("moving files")
         val_percent = int(len(files)*val_percent)
+
+        #Use last img as val if there are less than 5 imgs
+        if len(files) < 5:
+            val_file = files[-1]
+            base_path = os.path.basename(val_file)
+            dest = os.path.join(label_img_data,"val/",base_path)
+            shutil.copyfile(val_file, dest)
 
         for ix, file in enumerate(files):
             train_val = "val/"
@@ -76,7 +88,7 @@ class BloodcellModel(LabelStudioMLBase):
             dest = os.path.join(label_img_data,train_val,base_path)
             shutil.move(file, dest)
 
-    def reset_train_dir(self, dir_path):#TODO refactor
+    def reset_train_dir(self, dir_path):
         #remove cache file and reset train/val dir
         if os.path.isfile(os.path.join(dir_path,"train.cache")):
             os.remove(os.path.join(LABEL_DATA, "train.cache"))
@@ -87,18 +99,30 @@ class BloodcellModel(LabelStudioMLBase):
             os.makedirs(os.path.join(dir_path, dir))
 
     def fit(self, tasks, workdir=None, batch_size=8, num_epochs=10, **kwargs):
+        print("Start training")
         for dir_path in [IMG_DATA, LABEL_DATA]:
             self.reset_train_dir(dir_path)
-        
+
+        print(tasks) 
+        ###
+        # this is empty when using the submit annotations button
+        # need to fix assertion error no line 111/129 in the model.py file
+        ###
+
+        img_labels = []
         for task in tasks:
-            
+                
             if is_skipped(task):
                 continue
-            
+        
+            print(f"check tasks {task['annotations'][0]}")
+                
             image_url = self._get_image_url(task)
             image_path = self.get_local_path(image_url)
             image_name = image_path.split("\\")[-1]
             Image.open(image_path).save(IMG_DATA+image_name)
+
+            img_labels.append(task['annotations'][0]['result'])
 
             for annotation in task['annotations']:
                 for bbox in annotation['result']:
@@ -108,10 +132,10 @@ class BloodcellModel(LabelStudioMLBase):
                     y = (bbox['value']['y'] / 100 ) + (bb_height/2)
                     label = bbox['value']['rectanglelabels']
                     label_idx = self.label2idx(label[0])
-                    
+                        
                     with open(LABEL_DATA+image_name[:-4]+'.txt', 'a') as f:
                         f.write(f"{label_idx} {x} {y} {bb_width} {bb_height}\n")
-        
+            
         img_files = glob.glob(os.path.join(IMG_DATA, "*.jpg"))
         label_files = glob.glob(os.path.join(LABEL_DATA, "*.txt"))
 
@@ -119,19 +143,23 @@ class BloodcellModel(LabelStudioMLBase):
         self.move_files(label_files, LABEL_DATA)
 
         print("start training")
-        #TODO try to clean this (import train with argparse somehow)
-        #TODO check why CUDA doesn't work
-        os.system(f"python ./yolov7/train.py --workers 8 --device cpu --batch-size {batch_size} --data ./config/data.yaml --img {self.img_size[0]} {self.img_size[1]} --cfg ./config/model_config.yaml \
-            --weights {self.weights} --name bloodcell_trained --hyp ./config/hyp.scratch.custom.yaml --epochs {num_epochs} --exist-ok")
+        os.system(f"python ./yolov7/train.py --workers 8 --device {self.device} --batch-size {batch_size} --data ./config/data.yaml --img {self.img_size[0]} {self.img_size[1]} --cfg ./config/model_config.yaml \
+                --weights {self.weights} --name bloodcell_trained --hyp ./config/hyp.scratch.custom.yaml --epochs {num_epochs} --exist-ok")
 
-        shutil.move(f"./runs/train/bloodcell_trained/weights/best.pt", WEIGHTS_PATH)#move trained weights to checkpoint folder
+        shutil.move(f"./runs/train/bloodcell_trained/weights/best.pt", TRAINED_WEIGHTS)#move trained weights to checkpoint folder
         print("done training")
 
-        #TODO update model weights 
-        return {'model_path': WEIGHTS_PATH}
+        self.weights = TRAINED_WEIGHTS #updating to trained weights
+        print(f"The new weights are: {self.weights}")
+            
+        return {
+            'model_path': TRAINED_WEIGHTS,
+            'labels':img_labels
+        }
     
     def predict(self, tasks, **kwargs):
         print("start predictions")
+        print(f"the model uses: {self.weights} to predict")
         results = []
         all_scores= []
         print("LABELS IN CONFIG:",self.labels_in_config)
