@@ -108,6 +108,7 @@ class BloodcellModel(LabelStudioMLBase):
         ###
         # this is empty when using the submit annotations button
         # need to fix assertion error no line 111/129 in the model.py file
+        # apprently difference in webhook call vs api call
         ###
 
         img_labels = []
