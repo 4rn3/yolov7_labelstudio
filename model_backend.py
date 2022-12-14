@@ -6,8 +6,8 @@ from PIL import Image
 
 from label_studio_ml import model
 from label_studio_ml.model import LabelStudioMLBase
-from label_studio_ml.utils import get_image_size, get_single_tag_keys, is_skipped, get_choice
-from label_studio.core.utils.io import json_load, get_data_dir
+from label_studio_ml.utils import get_image_size, get_single_tag_keys, is_skipped
+from label_studio.core.utils.io import  get_data_dir
 
 model.LABEL_STUDIO_ML_BACKEND_V2_DEFAULT = True
 
@@ -100,6 +100,7 @@ class BloodcellModel(LabelStudioMLBase):
 
     def fit(self, tasks, workdir=None, batch_size=8, num_epochs=10, **kwargs):
         print("Start training")
+        
         for dir_path in [IMG_DATA, LABEL_DATA]:
             self.reset_train_dir(dir_path)
 
