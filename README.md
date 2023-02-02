@@ -5,7 +5,7 @@
     >`.\label-studio\Scripts\activate or on linux: source ./env/bin/activate`
 
 2. Clone this repo & install the required packages
-   >`git clone https://git.ti.howest.be/TI/2022-2023/s5/project-iv/projects/group01-v2/code.git`<br>
+   >`https://github.com/4rn3/yolov7_labelstudio.git`<br>
    > `cd code` <br>
    >`pip install -r requirements.txt` <br>
 
