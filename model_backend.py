@@ -162,7 +162,6 @@ class BloodcellModel(LabelStudioMLBase):
         self.move_files(label_files, LABEL_DATA)
 
         print("start training")
-        #TODO fix error when using CUDA in yolo train file
         os.system(f"python ./yolov7/train.py --workers 8 --device {self.device} --batch-size {batch_size} --data ./config/data.yaml --img {self.img_size[0]} {self.img_size[1]} --cfg ./config/model_config.yaml \
                 --weights {self.weights} --name bloodcell_trained --hyp ./config/hyp.scratch.p5.yaml --epochs {num_epochs} --exist-ok")
 
