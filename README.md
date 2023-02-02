@@ -5,7 +5,7 @@
     >`.\label-studio\Scripts\activate or on linux: source ./env/bin/activate`
 
 2. Clone this repo & install the required packages
-   >`https://github.com/4rn3/yolov7_labelstudio.git`<br>
+   >`git clone https://github.com/4rn3/yolov7_labelstudio.git`<br>
    > `cd code` <br>
    >`pip install -r requirements.txt` <br>
 
