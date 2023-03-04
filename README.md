@@ -1,4 +1,6 @@
-# Setting Up
+# Setup
+Guide to setup a labelstudio instance with a yolov7 backend
+
 1. Create a virtual environment for label studio 
     >`python -m venv label-studio`
 
@@ -57,7 +59,7 @@
    >Click save <br>
    >Go back to the main project view > click on the order type > Prediction score (make sure the arrow is pointing down) <br>
 
-   Now the images should be preannotated, the preannotated images are then ordered based on score to more easily improve the bad annotations. The model is updated with each submition or update of an annotation.
+   Now the images should be preannotated, the preannotations are then ordered based on score to more easily improve the bad annotations. The model is updated with each submition or update of an annotation.
 
 9. Bug in YOLOv7 loss.py
    > At the moment (15/12/2022) there seems to be a bug in the loss.py file of the yolov7 implementation. It results in the error: "RuntimeError: indices should be either on cpu or on the same device as the indexed tensor (cpu)" on line 759. The fixed that worked for me was to change line 742 to `matching_matrix = torch.zeros_like(cost, device="cpu")`
