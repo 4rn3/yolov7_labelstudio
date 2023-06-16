@@ -1,5 +1,5 @@
 # Setup
-Guide to setup a label studio instance with a yolov7 backend
+Setup guide for a label studio instance with a yolo(v7) backend
 
 1. Create a virtual environment for label studio 
     >`python -m venv label-studio`
